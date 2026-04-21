@@ -3,101 +3,117 @@ package ui;
 import java.awt.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import model.*;
 
-/**
- * Clase encargada de generar la ventana principal del programa.
- * Organiza la navegación por medio de pestañas.
- */
 public class VentanaPrincipal extends JFrame {
+    private JTabbedPane pestañas;
+    private JPanel panelParticularidadesContenedor;
+    private JComboBox<String> comboEspecies;
+    private Animal animalActual;
+    private DefaultTableModel modeloAnalisis; 
 
     public VentanaPrincipal() {
-        // Configuración básica de la ventana
         setTitle("Sistema de Formulación Nutricional Veterinaria");
-        setSize(800, 600);
+        setSize(850, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Creación del panel de pestañas
-        JTabbedPane pestañas = new JTabbedPane();
+        pestañas = new JTabbedPane();
 
-        // Inicialización de secciones
-        pestañas.addTab("Base de Datos Ingredientes", crearPanelIngredientes());
+        
         pestañas.addTab("Definición de Requerimientos", crearPanelRequerimientos());
-        pestañas.addTab("Cálculo de Ración", crearPanelCalculo());
+        
 
         add(pestañas);
     }
 
-
     private JPanel crearPanelRequerimientos() {
-        JPanel panel = new JPanel(new GridLayout(10, 2, 10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel principal = new JPanel(new BorderLayout(10, 10));
+        
+        // Formulario superior reducido (solo especie)
+        JPanel formularioEspecie = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        formularioEspecie.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        formularioEspecie.add(new JLabel("Seleccione Especie:"));
+        
+        String[] especies = {"Seleccione...", "Equino", "Porcino"};
+        comboEspecies = new JComboBox<>(especies);
+        formularioEspecie.add(comboEspecies);
 
-        panel.add(new JLabel("Especie:"));
-        String[] especies = {"Equinos", "Bovinos", "Caninos"};
-        panel.add(new JComboBox<>(especies));
+        panelParticularidadesContenedor = new JPanel(new BorderLayout());
+        panelParticularidadesContenedor.setBorder(BorderFactory.createTitledBorder("Datos Específicos"));
 
-        panel.add(new JLabel("Peso:"));
-        panel.add(new JTextField());
+        comboEspecies.addActionListener(e -> actualizarParticularidades());
 
-        panel.add(new JLabel("Unidad:"));
-        panel.add(new JComboBox<>(new String[]{"kg", "lb"}));
+        // Botón inferior
+        JButton btnCalcular = new JButton("Realizar Cálculo");
+        btnCalcular.setFont(new Font("SansSerif", Font.BOLD, 14));
+        btnCalcular.addActionListener(e -> {
+            if (animalActual != null) {
+                double resultado = animalActual.calcularRequerimientoEnergia();
 
-        return panel;
+                if (resultado > 0) {
+                    actualizarTablaResultados(resultado);
+
+                    if (!(animalActual instanceof Porcino)) {
+                        pestañas.setSelectedIndex(2); 
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Cálculo finalizado exitosamente.");
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error en los datos ingresados.");
+                }
+                }
+          });
+
+        principal.add(formularioEspecie, BorderLayout.NORTH);
+        principal.add(panelParticularidadesContenedor, BorderLayout.CENTER); 
+        principal.add(btnCalcular, BorderLayout.SOUTH);
+        
+        return principal;
+    }
+
+    private void actualizarParticularidades() {
+        panelParticularidadesContenedor.removeAll();
+        String seleccion = (String) comboEspecies.getSelectedItem();
+
+        if (seleccion.equals("Equino")) {
+            // animalActual = new Equino(0, "Kg", "Adulto"); 
+            // panelParticularidadesContenedor.add(animalActual.obtenerPanelPrincipal());
+        } else if (seleccion.equals("Porcino")) {
+            animalActual = new Porcino(0, "Kg"); 
+            panelParticularidadesContenedor.add(animalActual.obtenerPanelPrincipal(), BorderLayout.NORTH);
+        }
+
+        panelParticularidadesContenedor.revalidate();
+        panelParticularidadesContenedor.repaint();
+    }
+
+    private void actualizarTablaResultados(double valorCalculado) {
+        if (modeloAnalisis != null) {
+            modeloAnalisis.setRowCount(0); 
+            String resultadoFormateado = String.format("%.2f", valorCalculado);
+            modeloAnalisis.addRow(new Object[]{
+                "Conversión Alimenticia (CA)", "Eficiencia", resultadoFormateado, "Relación", "Calculado"
+            });
+        }
     }
 
     private JPanel crearPanelCalculo() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(new JLabel("Área de resultados y reportes", SwingConstants.CENTER), BorderLayout.CENTER);
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        String[] columnas = {"Nutriente", "Requerimiento", "Aporte Mezcla", "Diferencia", "% Cumplimiento"};
+        modeloAnalisis = new DefaultTableModel(columnas, 0);
+        JTable tablaAnalisis = new JTable(modeloAnalisis);
+        
+        panel.add(new JScrollPane(tablaAnalisis), BorderLayout.CENTER);
         return panel;
-    }
+    }   
     
     private JPanel crearPanelIngredientes() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panel.add(new JLabel("Panel de Ingredientes"));
+        return panel; 
 
-        String[] columnas = {
-            "Ingrediente", 
-            "MS (%)", 
-            "Prot. Cruda (%)", 
-            "Energía (Mcal)", 
-            "Fibra (%)", 
-            "Calcio (%)", 
-            "Fósforo (%)"
-        };
-
-        // Modelo de la tabla 
-        DefaultTableModel modeloTabla = new DefaultTableModel(columnas, 0);
-        JTable tablaIngredientes = new JTable(modeloTabla);
-        JScrollPane scrollPane = new JScrollPane(tablaIngredientes);
-
-        // Panel de botones para interactuar con la tabla
-        JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton btnAgregar = new JButton("Agregar Fila");
-        JButton btnEliminar = new JButton("Eliminar Fila");
-
-        btnAgregar.addActionListener(e -> {
-            modeloTabla.addRow(new Object[]{"Nuevo...", 0, 0, 0, 0, 0, 0});
-        });
-
-        btnEliminar.addActionListener(e -> {
-            int filaSeleccionada = tablaIngredientes.getSelectedRow();
-            if (filaSeleccionada != -1) {
-                modeloTabla.removeRow(filaSeleccionada);
-            } else {
-                JOptionPane.showMessageDialog(this, "Seleccione una fila para eliminar.");
-            }
-        });
-
-        panelBotones.add(btnAgregar);
-        panelBotones.add(btnEliminar);
-
-        // Organización del panel
-        panel.add(new JLabel("Composición Nutricional de Ingredientes", SwingConstants.CENTER), BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(panelBotones, BorderLayout.SOUTH);
-
-        return panel;
     }
-
 }
