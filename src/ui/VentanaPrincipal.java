@@ -14,15 +14,20 @@ public class VentanaPrincipal extends JFrame {
 
     public VentanaPrincipal() {
         setTitle("Sistema de Formulación Nutricional Veterinaria");
-        setSize(850, 650);
+        setSize(900, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         pestañas = new JTabbedPane();
 
         
-        pestañas.addTab("Definición de Requerimientos", crearPanelRequerimientos());
         
+        pestañas.addTab("Ingredientes", crearPanelIngredientes());
+        pestañas.addTab("Definición de Requerimientos", crearPanelRequerimientos());
+        pestañas.addTab("Cálculo de Ración", crearPanelCalculo()); // Aquí es donde verás la tabla 
+
+
+        pestañas.setSelectedIndex(1);
 
         add(pestañas);
     }
@@ -35,7 +40,7 @@ public class VentanaPrincipal extends JFrame {
         formularioEspecie.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         formularioEspecie.add(new JLabel("Seleccione Especie:"));
         
-        String[] especies = {"Seleccione...", "Equino", "Porcino"};
+        String[] especies = {"Seleccione...", "Equino", "Porcino", "Felino"};
         comboEspecies = new JComboBox<>(especies);
         formularioEspecie.add(comboEspecies);
 
@@ -77,8 +82,8 @@ public class VentanaPrincipal extends JFrame {
         String seleccion = (String) comboEspecies.getSelectedItem();
 
         if (seleccion.equals("Equino")) {
-            // animalActual = new Equino(0, "Kg", "Adulto"); 
-            // panelParticularidadesContenedor.add(animalActual.obtenerPanelPrincipal());
+             animalActual = new Equino(0.0, "Kg"); 
+             panelParticularidadesContenedor.add(animalActual.obtenerPanelPrincipal());
         } else if (seleccion.equals("Porcino")) {
             animalActual = new Porcino(0, "Kg"); 
             panelParticularidadesContenedor.add(animalActual.obtenerPanelPrincipal(), BorderLayout.NORTH);
@@ -90,11 +95,19 @@ public class VentanaPrincipal extends JFrame {
 
     private void actualizarTablaResultados(double valorCalculado) {
         if (modeloAnalisis != null) {
-            modeloAnalisis.setRowCount(0); 
-            String resultadoFormateado = String.format("%.2f", valorCalculado);
-            modeloAnalisis.addRow(new Object[]{
-                "Conversión Alimenticia (CA)", "Eficiencia", resultadoFormateado, "Relación", "Calculado"
-            });
+            modeloAnalisis.setRowCount(0); // Limpiamos tabla anterior
+            
+            if (animalActual instanceof Equino) {
+                // Si es Equino, mostramos el desglose completo del documento
+                modeloAnalisis.addRow(new Object[]{"Energía Digestible", "Mcal", String.format("%.2f", valorCalculado), "Requerido", "100%"});
+                // Aquí podrías añadir más filas si guardas las variables de proteína y minerales en la clase Equino
+                modeloAnalisis.addRow(new Object[]{"Proteína Cruda", "g", "Calculado", "Requerido", "100%"});
+                modeloAnalisis.addRow(new Object[]{"Calcio (Ca)", "g", "Calculado", "Requerido", "100%"});
+                modeloAnalisis.addRow(new Object[]{"Fósforo (P)", "g", "Calculado", "Requerido", "100%"});
+            } else {
+                // Si es Porcino, solo mostramos la Conversión Alimenticia
+                modeloAnalisis.addRow(new Object[]{"Conversión Alimenticia", "kg/kg", String.format("%.2f", valorCalculado), "N/A", "100%"});
+            }
         }
     }
 

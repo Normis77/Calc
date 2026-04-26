@@ -9,14 +9,12 @@ Permite manejar diferentes especies mediante herencia.
 public abstract class Animal {
     protected String especie;
     protected double peso;
-    protected String unidadPeso; 
-    
+    protected String unidadPeso;
 
     public Animal(String especie, double peso, String unidadPeso) {
         this.especie = especie;
         this.peso = peso;
         this.unidadPeso = unidadPeso;
-        
     }
 
     // Método para convertir el peso a kg si es necesario
@@ -27,13 +25,8 @@ public abstract class Animal {
         return peso;
     }
 
-    
-
     // Método abstracto que cada especie implementará según sus fórmulas
-
     public abstract JPanel obtenerPanelPrincipal();
     public abstract double calcularRequerimientoEnergia();
-
-    
-    
+    public abstract double calcularPesoMetabolico();
 }

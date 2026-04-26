@@ -83,6 +83,11 @@ public class Porcino extends Animal {
         return valor;
     }
 
+    @Override
+    public double calcularPesoMetabolico() {
+        return 0;
+    }
+
     // --------------------------------------------------------CÁLCULOS--------------------------------------------------------
 
     @Override
