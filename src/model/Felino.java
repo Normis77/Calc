@@ -22,7 +22,7 @@ import javax.swing.*;
  *     > 30 semanas:  100 * PesoKg   [Kcal]
  *   Marcados en AZUL (se calcula y se SUMA a la EM base):
  *     Gestacion:     EM + (1.25 * EM)
- *     Lactacion:     EM + (3.0  * EM)   <- factor 3 segun Perros.pdf
+ *     Lactacion:     EM + (3.0  * EM)   
  *
  * CALCULO DE RACION :
  *   Paso 1: DE = [(Prot%*3.5) + (Lip%*8.5) + (Carb%*3.5)] * 10  [Kcal/kg]
@@ -57,7 +57,6 @@ public class Felino extends Animal {
     // ----------------------------------------------------------
     // BASE DE DATOS de concentrados felinos
     // { Proteina%, Lipidos%, Carbohidratos% }
-    // Fuente: Perros.pdf y CALCULO_DE_RACIONES_1_.pdf
     // ----------------------------------------------------------
     private static final String[] NOMBRES_ALIM = {
         "Rufo (baja calidad)",
@@ -295,7 +294,7 @@ public class Felino extends Animal {
             ultimosResultados.put("  Energia total requerida",             String.format("%.2f Kcal/dia", energiaTotal));
 
             // --------------------------------------------------
-            // PASO 4: Calculo de racion (solo si se especifica alimento)
+            // PASO 4: Calculo de racion 
             // --------------------------------------------------
             if (chkSinAlimento.isSelected()) {
                 lblResultadoKg.setText("No especificado");

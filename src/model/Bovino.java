@@ -407,7 +407,7 @@ public class Bovino extends Animal {
             double litrosProt = protDisp > 0 ? protDisp / gPorLitro  : 0.0;
 
             // ==================================================
-            // PASO 6: AJUSTE F1/F2 (AUTOMATICO)
+            // PASO 6: AJUSTE F1/F2 
             //   Solo se ejecuta si hay desequilibrio y el usuario
             //   selecciono un alimento de ajuste valido.
             // ==================================================

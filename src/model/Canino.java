@@ -76,7 +76,6 @@ public class Canino extends Animal {
     // ----------------------------------------------------------
     // BASE DE DATOS de concentrados caninos
     // { Proteina%, Lipidos%, Carbohidratos% }
-    // Fuente: Perros.pdf y CALCULO_DE_RACIONES_1_.pdf
     // ----------------------------------------------------------
     private static final String[] NOMBRES_ALIM = {
         "Rufo (baja calidad)",
@@ -90,7 +89,7 @@ public class Canino extends Animal {
     };
 
     // ----------------------------------------------------------
-    // Estados fisiologicos con sus factores (tabla Perros.pdf)
+    // Estados fisiologicos con sus factores 
     // Para rangos se usa el valor promedio del intervalo
     // ----------------------------------------------------------
     private static final String[] ESTADOS = {
@@ -326,7 +325,7 @@ public class Canino extends Animal {
     }
 
     // ==========================================================
-    //  CALCULO PRINCIPAL
+    //  CÁLCULO PRINCIPAL
     // ==========================================================
     @Override
     public double calcularRequerimientoEnergia() {
@@ -415,7 +414,7 @@ public class Canino extends Animal {
             ultimosResultados.put("  Paso 3 - Energia ajustada",        String.format("%.2f * %.2f = %.2f Kcal/dia", em, factor, energiaAdj));
 
             // --------------------------------------------------
-            // PASO 6: Calculo de racion (solo si hay alimento)
+            // PASO 6: Calculo de racion 
             // --------------------------------------------------
             if (chkSinAlimento.isSelected()) {
                 lblResultadoKg.setText("No especificado");

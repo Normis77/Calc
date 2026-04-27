@@ -13,7 +13,7 @@ public abstract class Animal {
 
     /**
      * Constructor base.
-     * @param especie     Nombre de la especie (ej. "Equino")
+     * @param especie     Nombre de la especie 
      * @param peso        Peso del animal en la unidad indicada
      * @param unidadPeso  "Kg" o "Lb"
      */
