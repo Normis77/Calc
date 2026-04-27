@@ -5,40 +5,123 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.swing.*;
 
+/**
+ * ============================================================
+ *  Formulación de Raciones para Leche
+ * ============================================================
+ *
+ * PASO 1 - REQUERIMIENTOS DE MANTENIMIENTO :
+ *   a. Peso Kg (si viene en Lb: dividir entre 2.2)
+ *   b. Peso Metabolico = PesoKg ^ 0.75
+ *   c. Energia ENL     = PM * 0.293           [MJ ENL/dia]
+ *   d. Proteina mant.  = 425 g para los primeros 500 Kg
+ *                      + 0.5 g por cada Kg adicional sobre 500
+ *   e. Minerales (por litro de leche que produce):
+ *        Ca = litros * 3.2  g
+ *        P  = litros * 1.7  g
+ *        Mg = litros * 0.6  g
+ *        Na = litros * 0.6  g
+ *
+ * PASO 2 - TIPO DE LECHE (por % de grasa):
+ *   3.5% -> Tipo I:   2.97 MJ ENL/litro,  80 g proteina/litro
+ *   4.0% -> Tipo II:  3.17 MJ ENL/litro,  85 g proteina/litro
+ *   4.5% -> Tipo III: 3.37 MJ ENL/litro,  90 g proteina/litro
+ *
+ * PASO 3 - ANALISIS DE LA RACION:
+ *   El usuario elige cada ingrediente de la base de datos
+ *   e ingresa los Kg suministrados.
+ *   Proteina de cada ingrediente: PC% * 10 = g/Kg
+ *   Energia de cada ingrediente:  Kg * MJ_ENL/Kg
+ *   Proteina de cada ingrediente: Kg * g_proteina/Kg
+ *   Se suman los aportes de todos los ingredientes.
+ *
+ * PASO 4 - EVALUACION DE LA RACIÓN:
+ *   Energia disponible para producir  = Energia_racion  - Energia_mant
+ *   Proteina disponible para producir = Proteina_racion - Proteina_mant
+ *   Litros producibles con energia    = Energia_disp  / MJ_por_litro
+ *   Litros producibles con proteina   = Proteina_disp / g_por_litro
+ *
+ * PASO 5 - AJUSTE F1/F2 (AUTOMÁTICO):
+ *   Si litros_energia != litros_proteina (diferencia > 0.01):
+ *     F1 = litros_proteina - litros_energia
+ *     (si F1 > 0: energia es el factor limitante -> agregar alimento energetico)
+ *     (si F1 < 0: proteina es el factor limitante -> agregar alimento proteico)
+ *   El usuario elige el alimento de ajuste del ComboBox.
+ *   F2 = (MJ_ajuste / MJ_por_litro) - (PC_ajuste / g_por_litro)
+ *   Kg de ajuste = F1 / F2
+ *   Se verifica recalculando la racion con el ajuste incluido.
+ *
+ * CONVERSION: Kg <-> Lb (1 kg = 2.2 lb)
+ *
+ *
+ * ============================================================
+ */
 public class Bovino extends Animal {
 
-    // Datos generales del animal
-    private JTextField txtPeso;
-    private JTextField txtLitrosLeche;    // litros que produce (para minerales)
-    private JTextField txtGrasaLeche;     // % grasa de la leche
+    // ----------------------------------------------------------
+    // Componentes Swing - inicializados UNA VEZ en constructor
+    // ----------------------------------------------------------
+    private JTextField        txtPeso;
+    private JTextField        txtLitrosLeche;
+    private JTextField        txtGrasaLeche;
     private JComboBox<String> cbUnidadPeso;
 
-    // Ingredientes de la racion (hasta 3 ingredientes)
-    private JTextField[] txtKgIng      = new JTextField[3];
-    private JTextField[] txtPcPctIng   = new JTextField[3];   // % de proteina
-    private JTextField[] txtMjIng      = new JTextField[3];   // MJ ENL/Kg
+    // Hasta 4 ingredientes de la racion base: combo + Kg suministrados
+    private static final int MAX_ING = 4;
+    private JComboBox<String>[] cbIngrediente = new JComboBox[MAX_ING];
+    private JTextField[]        txtKgIng      = new JTextField[MAX_ING];
 
-    // Alimento de ajuste F1/F2
-    private JTextField txtAjustePcPct;
-    private JTextField txtAjusteMj;
-    private JLabel lblNombreAjuste;
+    // Ingrediente de ajuste F1/F2
+    private JComboBox<String> cbIngAjuste;
 
     // Etiquetas de resultado
     private JLabel lblResMantenimiento;
     private JLabel lblResRacion;
+    private JLabel lblResDisponible;
     private JLabel lblResLitros;
     private JLabel lblResAjuste;
+    private JLabel lblResFinal;
 
-    // Tabla de tipo de leche: { % grasa, MJ ENL/litro, g proteina/litro }
+    // ----------------------------------------------------------
+    // BASE DE DATOS BOVINOS
+    // { PC%, MJ ENL/Kg }
+    // PC en % -> para obtener g/Kg multiplicar por 10
+    // ----------------------------------------------------------
+    private static final String[] NOMBRES_ING = {
+        "-- Seleccione ingrediente --",
+        "Heno 1er corte   (PC 5.5%,  2.10 MJ/Kg)",
+        "Heno 2do corte   (PC 11.5%, 4.40 MJ/Kg)",
+        "Soya             (PC 45%,   7.10 MJ/Kg)",
+        "Cebada           (PC 10.5%, 7.25 MJ/Kg)",
+        "Alfalfa          (PC 3.3%,  2.20 MJ/Kg)",
+        "Avena            (PC 14.8%, 7.70 MJ/Kg)",
+        "Concentrado      (PC 22%,   6.50 MJ/Kg)"
+    };
+    // { PC%, MJ ENL/Kg } - indice 0 es "Seleccione" (valores cero)
+    private static final double[][] DB_ING = {
+        {  0.0,  0.00},   // placeholder "Seleccione"
+        {  5.5,  2.10},   // Heno 1er corte
+        { 11.5,  4.40},   // Heno 2do corte
+        { 45.0,  7.10},   // Soya
+        { 10.5,  7.25},   // Cebada
+        {  3.3,  2.20},   // Alfalfa
+        { 14.8,  7.70},   // Avena
+        { 22.0,  6.50}    // Concentrado
+    };
+
+    // Tabla de tipos de leche: { % grasa limite sup, MJ/litro, g prot/litro }
     private static final double[][] TIPOS_LECHE = {
-        {3.5, 2.97, 80.0},
-        {4.0, 3.17, 85.0},
-        {4.5, 3.37, 90.0}
+        {3.75, 2.97, 80.0},   // Tipo I   (3.5% grasa)
+        {4.25, 3.17, 85.0},   // Tipo II  (4.0% grasa)
+        {9.99, 3.37, 90.0}    // Tipo III (4.5% grasa)
     };
 
     private Map<String, String> ultimosResultados = new LinkedHashMap<>();
 
-    // -------------------------------------------------------------------------
+    // ==========================================================
+    // CONSTRUCTOR
+    // ==========================================================
+    @SuppressWarnings("unchecked")
     public Bovino(double peso, String unidad) {
         super("Bovino", peso, unidad);
 
@@ -47,155 +130,194 @@ public class Bovino extends Animal {
         txtGrasaLeche  = new JTextField("4.0", 5);
         cbUnidadPeso   = new JComboBox<>(new String[]{"Kg", "Lb"});
 
-        for (int i = 0; i < 3; i++) {
-            txtKgIng[i]    = new JTextField(6);
-            txtPcPctIng[i] = new JTextField(6);
-            txtMjIng[i]    = new JTextField(6);
+        for (int i = 0; i < MAX_ING; i++) {
+            cbIngrediente[i] = new JComboBox<>(NOMBRES_ING);
+            txtKgIng[i]      = new JTextField(6);
         }
+        // Preselecciones comunes para los primeros dos ingredientes
+        cbIngrediente[0].setSelectedIndex(1); // Heno 1er corte
+        cbIngrediente[1].setSelectedIndex(4); // Cebada
 
-        txtAjustePcPct   = new JTextField(6);
-        txtAjusteMj      = new JTextField(6);
-        lblNombreAjuste  = new JLabel("Alimento de ajuste:");
+        cbIngAjuste = new JComboBox<>(NOMBRES_ING);
+        cbIngAjuste.setSelectedIndex(4); // Cebada por defecto (tipico ajuste energetico)
 
         lblResMantenimiento = new JLabel("-");
         lblResRacion        = new JLabel("-");
+        lblResDisponible    = new JLabel("-");
         lblResLitros        = new JLabel("-");
         lblResAjuste        = new JLabel("-");
+        lblResFinal         = new JLabel("-");
     }
 
-    // -------------------------------------------------------------------------
+    // ==========================================================
+    // PANEL VISUAL
+    // ==========================================================
     @Override
     public JPanel obtenerPanelPrincipal() {
         JPanel contenedor = new JPanel();
         contenedor.setLayout(new BoxLayout(contenedor, BoxLayout.Y_AXIS));
         contenedor.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
-        // Tabla de tipos de leche 
+        // Tabla de tipos de leche (referencia)
         String[] colLeche = {"% Grasa", "Tipo", "MJ ENL/litro", "Proteina g/litro"};
         Object[][] dataLeche = {
             {"3.5%", "I",   "2.97", "80"},
             {"4.0%", "II",  "3.17", "85"},
             {"4.5%", "III", "3.37", "90"}
         };
-        JTable tablaLeche = new JTable(new javax.swing.table.DefaultTableModel(dataLeche, colLeche));
+        JTable tablaLeche = new JTable(
+            new javax.swing.table.DefaultTableModel(dataLeche, colLeche));
         tablaLeche.setEnabled(false);
         tablaLeche.setRowHeight(22);
         JScrollPane scrollLeche = new JScrollPane(tablaLeche);
         scrollLeche.setPreferredSize(new Dimension(500, 88));
         scrollLeche.setBorder(BorderFactory.createTitledBorder(
-            "Referencia - Requerimientos por Litro de Leche segun % de Grasa"));
+            "Referencia - Requerimientos por Litro segun % Grasa de la Leche"));
         contenedor.add(scrollLeche);
 
-        // Datos generales del animal
+        // Datos del animal
         JPanel panelAnimal = new JPanel();
         panelAnimal.setLayout(new BoxLayout(panelAnimal, BoxLayout.Y_AXIS));
         panelAnimal.setBorder(BorderFactory.createTitledBorder("Datos del Animal"));
-        panelAnimal.add(crearFila("Peso vivo:",         txtPeso,        cbUnidadPeso));
-        panelAnimal.add(crearFila("Litros de leche/dia:",txtLitrosLeche, new JLabel("litros")));
-        panelAnimal.add(crearFila("% grasa de la leche:",txtGrasaLeche, new JLabel("% (para determinar tipo de leche)")));
+        panelAnimal.add(crearFila("Peso vivo:",            txtPeso,        cbUnidadPeso));
+        panelAnimal.add(crearFila("Litros de leche/dia:",  txtLitrosLeche, new JLabel("litros")));
+        panelAnimal.add(crearFila("% grasa de la leche:",  txtGrasaLeche,  new JLabel("%")));
         contenedor.add(panelAnimal);
 
-        // Racion ofrecida (hasta 3 ingredientes)
+        // Racion ofrecida: ComboBox de ingredientes + Kg
         JPanel panelRacion = new JPanel(new GridBagLayout());
         panelRacion.setBorder(BorderFactory.createTitledBorder(
-            "Racion Ofrecida (ingrese los ingredientes disponibles)"));
+            "Racion Ofrecida - Elija ingredientes de la base de datos"));
         GridBagConstraints gc = new GridBagConstraints();
         gc.insets = new Insets(3, 5, 3, 5);
         gc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Encabezados
+        // Encabezados de columna
         gc.gridy = 0;
-        gc.gridx = 0; gc.weightx = 0.30; panelRacion.add(new JLabel("Ingrediente"), gc);
-        gc.gridx = 1; gc.weightx = 0.20; panelRacion.add(new JLabel("Kg suministrados"), gc);
-        gc.gridx = 2; gc.weightx = 0.20; panelRacion.add(new JLabel("% Proteina (PC)"), gc);
-        gc.gridx = 3; gc.weightx = 0.30; panelRacion.add(new JLabel("MJ ENL/Kg"), gc);
+        gc.gridx = 0; gc.weightx = 0.70;
+        panelRacion.add(new JLabel("Ingrediente (base de datos)"), gc);
+        gc.gridx = 1; gc.weightx = 0.30;
+        panelRacion.add(new JLabel("Kg suministrados"), gc);
 
-        String[] nombresIng = {"Ingrediente 1 (ej. Ensilado):", "Ingrediente 2 (ej. Heno):", "Ingrediente 3 (opcional):"};
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < MAX_ING; i++) {
             gc.gridy = i + 1;
-            gc.gridx = 0; panelRacion.add(new JLabel(nombresIng[i]), gc);
-            gc.gridx = 1; panelRacion.add(txtKgIng[i], gc);
-            gc.gridx = 2; panelRacion.add(txtPcPctIng[i], gc);
-            gc.gridx = 3; panelRacion.add(txtMjIng[i], gc);
+            gc.gridx = 0; gc.weightx = 0.70;
+            panelRacion.add(cbIngrediente[i], gc);
+            gc.gridx = 1; gc.weightx = 0.30;
+            panelRacion.add(txtKgIng[i], gc);
         }
+        JLabel notaRac = new JLabel(
+            "  Deje en blanco (o elija '--') los ingredientes que no use.");
+        notaRac.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        notaRac.setForeground(Color.GRAY);
+        gc.gridy = MAX_ING + 1; gc.gridx = 0; gc.gridwidth = 2;
+        panelRacion.add(notaRac, gc);
         contenedor.add(panelRacion);
 
         // Alimento de ajuste F1/F2
         JPanel panelAjuste = new JPanel();
         panelAjuste.setLayout(new BoxLayout(panelAjuste, BoxLayout.Y_AXIS));
         panelAjuste.setBorder(BorderFactory.createTitledBorder(
-            "Alimento de Ajuste F1/F2 (ej. Cebada para energia, Soya para proteina)"));
-        panelAjuste.add(crearFila("% Proteina del ajuste:", txtAjustePcPct, new JLabel("% PC")));
-        panelAjuste.add(crearFila("MJ ENL/Kg del ajuste:",  txtAjusteMj,   new JLabel("MJ ENL/Kg")));
-        JLabel notaAj = new JLabel("  Ejemplo cebada: 10.5% proteina, 7.25 MJ ENL.  Deje vacio si no hay ajuste.");
+            "Alimento de Ajuste F1/F2 (el programa lo usa automaticamente si hay desequilibrio)"));
+        panelAjuste.add(crearFila("Alimento de ajuste:", cbIngAjuste, new JLabel("")));
+        JLabel notaAj = new JLabel(
+            "  Si energia < proteina: use alimento energetico (ej. Cebada, Avena).  " +
+            "Si proteina < energia: use alimento proteico (ej. Soya).");
         notaAj.setFont(new Font("SansSerif", Font.ITALIC, 11));
         notaAj.setForeground(Color.GRAY);
         panelAjuste.add(notaAj);
         contenedor.add(panelAjuste);
 
-        // Panel de resultados rapidos
-        JPanel panelRes = new JPanel(new GridLayout(4, 1, 4, 4));
+        // Resultados rapidos en pantalla
+        JPanel panelRes = new JPanel(new GridLayout(6, 1, 2, 2));
         panelRes.setBorder(BorderFactory.createTitledBorder("Resultado (presione Realizar Calculo)"));
-        lblResMantenimiento.setFont(new Font("Monospaced", Font.PLAIN, 11));
-        lblResRacion.setFont(new Font("Monospaced", Font.PLAIN, 11));
-        lblResLitros.setFont(new Font("Monospaced", Font.BOLD, 12));
-        lblResLitros.setForeground(new Color(0, 100, 200));
-        lblResAjuste.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        Font mf = new Font("Monospaced", Font.PLAIN, 11);
+        lblResMantenimiento.setFont(mf);
+        lblResRacion.setFont(mf);
+        lblResDisponible.setFont(mf);
+        estilizar(lblResLitros,   new Color(0, 100, 200));
+        estilizar(lblResAjuste,   new Color(150, 80, 0));
+        estilizar(lblResFinal,    new Color(0, 120, 0));
         panelRes.add(lblResMantenimiento);
         panelRes.add(lblResRacion);
+        panelRes.add(lblResDisponible);
         panelRes.add(lblResLitros);
         panelRes.add(lblResAjuste);
+        panelRes.add(lblResFinal);
         contenedor.add(panelRes);
 
         return contenedor;
     }
 
     private JPanel crearFila(String titulo, JComponent campo, JComponent extra) {
+        return crearFila(new JLabel(titulo), campo, extra);
+    }
+
+    private JPanel crearFila(JComponent etiqueta, JComponent campo, JComponent extra) {
         JPanel p = new JPanel(new GridBagLayout());
         GridBagConstraints g = new GridBagConstraints();
         g.insets = new Insets(4, 6, 4, 6);
         g.fill = GridBagConstraints.HORIZONTAL;
-        g.gridx = 0; g.weightx = 0.40; p.add(new JLabel(titulo), g);
-        g.gridx = 1; g.weightx = 0.35; p.add(campo, g);
-        g.gridx = 2; g.weightx = 0.25; p.add(extra, g);
+        g.gridx = 0; g.weightx = 0.40; p.add(etiqueta, g);
+        g.gridx = 1; g.weightx = 0.45; p.add(campo, g);
+        g.gridx = 2; g.weightx = 0.15; p.add(extra, g);
         return p;
     }
 
+    private void estilizar(JLabel lbl, Color c) {
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        lbl.setForeground(c);
+    }
+
     private double aKg(double valor) {
-        return "Lb".equals(cbUnidadPeso.getSelectedItem()) ? valor / 2.2 : valor;
+        String u = (String) cbUnidadPeso.getSelectedItem();
+        return (u != null && u.equalsIgnoreCase("Lb")) ? valor / 2.2 : valor;
     }
 
-    /** Convierte % de proteina a g/Kg: PC% * 10 */
-    private double pcPctAGramos(double pct) { return pct * 10.0; }
+    /** Convierte PC% a g/Kg: multiplicar por 10. */
+    private double pcPctAGkg(double pct) { return pct * 10.0; }
 
-    /** Determina el tipo de leche segun % grasa. Retorna { MJ/litro, g prot/litro } */
-    private double[] tipoLeche(double grasaPct) {
-        if (grasaPct <= 3.75)       return new double[]{TIPOS_LECHE[0][1], TIPOS_LECHE[0][2]};
-        else if (grasaPct <= 4.25)  return new double[]{TIPOS_LECHE[1][1], TIPOS_LECHE[1][2]};
-        else                        return new double[]{TIPOS_LECHE[2][1], TIPOS_LECHE[2][2]};
+    /**
+     * Determina el tipo de leche segun el % de grasa.
+     * Retorna { MJ ENL/litro, g proteina/litro }
+     */
+    private double[] tipLeche(double grasaPct) {
+        for (double[] t : TIPOS_LECHE) {
+            if (grasaPct <= t[0]) return new double[]{t[1], t[2]};
+        }
+        return new double[]{TIPOS_LECHE[2][1], TIPOS_LECHE[2][2]};
     }
 
-    private String nombreTipoLeche(double grasaPct) {
-        if (grasaPct <= 3.75)       return "Tipo I  (3.5% grasa)";
-        else if (grasaPct <= 4.25)  return "Tipo II (4.0% grasa)";
-        else                        return "Tipo III(4.5% grasa)";
+    private String nomTipoLeche(double grasaPct) {
+        if (grasaPct <= 3.75) return "Tipo I  (3.5% grasa): 2.97 MJ/L, 80 g prot/L";
+        if (grasaPct <= 4.25) return "Tipo II (4.0% grasa): 3.17 MJ/L, 85 g prot/L";
+        return                       "Tipo III(4.5% grasa): 3.37 MJ/L, 90 g prot/L";
     }
 
-    @Override public double calcularPesoMetabolico() {
+    @Override
+    public double calcularPesoMetabolico() {
         try {
-            double kg = aKg(Double.parseDouble(txtPeso.getText().trim().replace(",",".")));
-            return Math.pow(kg, 0.75);
+            return Math.pow(aKg(Double.parseDouble(
+                txtPeso.getText().trim().replace(",", "."))), 0.75);
         } catch (Exception e) { return 0; }
     }
 
+    // ==========================================================
+    //  CALCULO PRINCIPAL
+    // ==========================================================
     @Override
     public double calcularRequerimientoEnergia() {
         ultimosResultados.clear();
         try {
-            // -------  Datos del animal -----------------------------------------
-            double pesoKg  = aKg(Double.parseDouble(txtPeso.getText().trim().replace(",",".")));
-            double litros  = Double.parseDouble(txtLitrosLeche.getText().trim().replace(",","."));
-            double grasaPct = Double.parseDouble(txtGrasaLeche.getText().trim().replace(",","."));
+            // ==================================================
+            // PASO 1: DATOS DEL ANIMAL
+            // ==================================================
+            double pesoKg   = aKg(Double.parseDouble(
+                txtPeso.getText().trim().replace(",", ".")));
+            double litros   = Double.parseDouble(
+                txtLitrosLeche.getText().trim().replace(",", "."));
+            double grasaPct = Double.parseDouble(
+                txtGrasaLeche.getText().trim().replace(",", "."));
 
             if (pesoKg <= 0 || litros < 0 || grasaPct <= 0) {
                 JOptionPane.showMessageDialog(null,
@@ -203,181 +325,236 @@ public class Bovino extends Animal {
                 return 0;
             }
 
-            // ------- Requerimientos de mantenimiento -------------------------
-            double pm          = Math.pow(pesoKg, 0.75);
-            double enlMant     = pm * 0.293;   // MJ ENL de mantenimiento
+            // ==================================================
+            // PASO 2: REQUERIMIENTOS DE MANTENIMIENTO
+            // ==================================================
 
-            // Proteina de mantenimiento
+            // 2a. Peso Metabolico
+            double pm = Math.pow(pesoKg, 0.75);
+
+            // 2b. Energia de mantenimiento
+            //     ENL_mant = PM * 0.293  [MJ ENL]
+            double enlMant = pm * 0.293;
+
+            // 2c. Proteina de mantenimiento
+            //     425 g para los primeros 500 Kg
+            //     + 0.5 g por cada Kg adicional sobre 500
             double protMant;
             if (pesoKg <= 500.0) {
-                // Para animales <= 500 kg: 425 g base mas proporcion
+                // Regla de 3 para animales menores a 500 Kg
                 protMant = 425.0 * (pesoKg / 500.0);
             } else {
-                // 425 g por los primeros 500 kg + 0.5 g por cada kg adicional
                 protMant = 425.0 + (pesoKg - 500.0) * 0.5;
             }
 
-            // Minerales por litros producidos
+            // 2d. Minerales (por litro de leche producida)
             double rCa = litros * 3.2;
             double rP  = litros * 1.7;
             double rMg = litros * 0.6;
             double rNa = litros * 0.6;
 
-            // ------- Tipo de leche y requerimientos por litro ---------------
-            double[] tipReqs = tipoLeche(grasaPct);
-            double mjPorLitro   = tipReqs[0];
-            double protPorLitro = tipReqs[1];
-            String nomTipo      = nombreTipoLeche(grasaPct);
+            // ==================================================
+            // PASO 3: TIPO DE LECHE
+            // ==================================================
+            double[] tipReqs    = tipLeche(grasaPct);
+            double   mjPorLitro = tipReqs[0];   // MJ ENL necesarios por litro
+            double   gPorLitro  = tipReqs[1];   // g proteina necesarios por litro
+            String   nomTipo    = nomTipoLeche(grasaPct);
 
-            // ------- PASO 4: Analisis de la racion -----------------------------------
+            // ==================================================
+            // PASO 4: ANALISIS DE LA RACION BASE
+            // ==================================================
             double enlRacion  = 0.0;
             double protRacion = 0.0;
-            int nIng = 0;
+            int    nIngUsados = 0;
 
-            for (int i = 0; i < 3; i++) {
-                String tKg = txtKgIng[i].getText().trim().replace(",",".");
-                String tPc = txtPcPctIng[i].getText().trim().replace(",",".");
-                String tMj = txtMjIng[i].getText().trim().replace(",",".");
-                if (tKg.isEmpty() || tPc.isEmpty() || tMj.isEmpty()) continue;
-                double kg  = Double.parseDouble(tKg);
-                double pc  = Double.parseDouble(tPc);  // en %
-                double mj  = Double.parseDouble(tMj);
+            // Recorrer los 4 ingredientes posibles
+            for (int i = 0; i < MAX_ING; i++) {
+                int selIdx = cbIngrediente[i].getSelectedIndex();
+                // Indice 0 = "Seleccione" -> omitir
+                if (selIdx == 0) continue;
+                String tKg = txtKgIng[i].getText().trim().replace(",", ".");
+                if (tKg.isEmpty()) continue;
+                double kg = Double.parseDouble(tKg);
                 if (kg <= 0) continue;
+
+                double pcPct = DB_ING[selIdx][0];   // % proteina
+                double mj    = DB_ING[selIdx][1];   // MJ ENL/Kg
+
+                // Aporte energetico: Kg * MJ/Kg
                 enlRacion  += kg * mj;
-                protRacion += kg * pcPctAGramos(pc);
-                nIng++;
+                // Aporte proteico:  Kg * (PC% * 10) = Kg * g/Kg
+                protRacion += kg * pcPctAGkg(pcPct);
+                nIngUsados++;
             }
 
-            if (nIng == 0) {
+            if (nIngUsados == 0) {
                 JOptionPane.showMessageDialog(null,
-                    "Ingrese al menos un ingrediente en la racion (Kg, % Proteina y MJ ENL/Kg).");
+                    "Ingrese al menos un ingrediente en la racion " +
+                    "(elija del ComboBox e ingrese los Kg).");
                 return 0;
             }
 
-            // -------  Evaluacion - disponible para producir -------------------
+            // ==================================================
+            // PASO 5: EVALUACION DE LA RACION
+            //   Disponible para producir = Aporte_racion - Mantenimiento
+            // ==================================================
             double enlDisp  = enlRacion  - enlMant;
             double protDisp = protRacion - protMant;
 
-            // Litros que se pueden producir
-            double litrosConEnl  = enlDisp  > 0 ? enlDisp  / mjPorLitro   : 0.0;
-            double litrosConProt = protDisp > 0 ? protDisp / protPorLitro  : 0.0;
+            // Litros producibles con cada nutriente
+            double litrosEnl  = enlDisp  > 0 ? enlDisp  / mjPorLitro : 0.0;
+            double litrosProt = protDisp > 0 ? protDisp / gPorLitro  : 0.0;
 
-            // -------  Ajuste F1/F2 --------------------------------------------
-            double f1    = 0.0;
-            double kgAjuste = 0.0;
-            String mensajeAjuste = "No se requiere ajuste.";
-            double litrosFinalEnl  = litrosConEnl;
-            double litrosFinalProt = litrosConProt;
-            boolean ajusteRealizado = false;
+            // ==================================================
+            // PASO 6: AJUSTE F1/F2 (AUTOMATICO)
+            //   Solo se ejecuta si hay desequilibrio y el usuario
+            //   selecciono un alimento de ajuste valido.
+            // ==================================================
+            int    ajusteIdx     = cbIngAjuste.getSelectedIndex();
+            double kgAjuste      = 0.0;
+            double litrosEnlFin  = litrosEnl;
+            double litrosProtFin = litrosProt;
+            String mensajeAjuste = "No se requiere ajuste (litros balanceados).";
+            boolean ajusteHecho  = false;
 
-            String tAjPc = txtAjustePcPct.getText().trim().replace(",",".");
-            String tAjMj = txtAjusteMj.getText().trim().replace(",",".");
+            if (ajusteIdx > 0 && litrosEnl > 0 && litrosProt > 0
+                    && Math.abs(litrosEnl - litrosProt) > 0.01) {
 
-            if (!tAjPc.isEmpty() && !tAjMj.isEmpty() && litrosConEnl > 0 && litrosConProt > 0) {
-                double ajPc = Double.parseDouble(tAjPc);
-                double ajMj = Double.parseDouble(tAjMj);
+                // F1 = litrosProt - litrosEnl
+                // Si F1 > 0 : energia es el factor limitante (se produce menos con energia)
+                //             -> el alimento de ajuste debe ser rico en energia
+                // Si F1 < 0 : proteina es el factor limitante
+                //             -> el alimento de ajuste debe ser rico en proteina
+                double f1 = litrosProt - litrosEnl;
 
-                // F1 = diferencia de litros (proteina - energia)
-                f1 = litrosConProt - litrosConEnl;
+                double ajPcPct = DB_ING[ajusteIdx][0];   // % PC del alimento de ajuste
+                double ajMj    = DB_ING[ajusteIdx][1];   // MJ/Kg del alimento de ajuste
 
-                if (Math.abs(f1) > 0.01) {
-                    // Litros que produce 1 Kg del alimento de ajuste
-                    double litrosPor1KgEnl  = ajMj  / mjPorLitro;
-                    double litrosPor1KgProt = pcPctAGramos(ajPc) / protPorLitro;
-                    double f2 = litrosPor1KgEnl - litrosPor1KgProt;
+                // Litros que produce 1 Kg del alimento de ajuste
+                double litrosPor1KgEnl  = ajMj            / mjPorLitro;
+                double litrosPor1KgProt = pcPctAGkg(ajPcPct) / gPorLitro;
 
-                    if (Math.abs(f2) > 0.001) {
-                        kgAjuste = Math.abs(f1) / Math.abs(f2);
+                // F2 = diferencia de litros entre energia y proteina para 1 Kg del ajuste
+                double f2 = litrosPor1KgEnl - litrosPor1KgProt;
 
-                        // Nuevo aporte de energia y proteina con el ajuste
-                        double enlAjuste  = kgAjuste * ajMj;
-                        double protAjuste = kgAjuste * pcPctAGramos(ajPc);
+                if (Math.abs(f2) > 0.001) {
+                    // Kg de ajuste = F1 / F2
+                    kgAjuste = f1 / f2;
 
-                        double enlTotal2  = enlRacion  + enlAjuste;
-                        double protTotal2 = protRacion + protAjuste;
-                        double enlDisp2   = enlTotal2  - enlMant;
-                        double protDisp2  = protTotal2 - protMant;
-
-                        litrosFinalEnl  = enlDisp2  > 0 ? enlDisp2  / mjPorLitro   : 0;
-                        litrosFinalProt = protDisp2 > 0 ? protDisp2 / protPorLitro  : 0;
+                    if (kgAjuste > 0) {
+                        // Recalcular totales con el ajuste incluido
+                        double enlTot2  = enlRacion  + kgAjuste * ajMj;
+                        double protTot2 = protRacion + kgAjuste * pcPctAGkg(ajPcPct);
+                        double enlD2    = enlTot2  - enlMant;
+                        double protD2   = protTot2 - protMant;
+                        litrosEnlFin  = enlD2  > 0 ? enlD2  / mjPorLitro : 0;
+                        litrosProtFin = protD2 > 0 ? protD2 / gPorLitro  : 0;
 
                         mensajeAjuste = String.format(
-                            "F1=%.2f  F2=%.2f  -> Agregar %.4f Kg del alimento de ajuste",
-                            f1, f2, kgAjuste);
-                        ajusteRealizado = true;
+                            "F1=%.2f  F2=%.2f  -> Agregar %.4f Kg de: %s",
+                            f1, f2, kgAjuste, NOMBRES_ING[ajusteIdx].trim());
+                        ajusteHecho = true;
+                    } else {
+                        mensajeAjuste = "Ajuste no aplicable (kgAjuste <= 0). " +
+                            "Revise el tipo de alimento de ajuste.";
                     }
                 } else {
-                    mensajeAjuste = "Los litros con energia y proteina ya estan equilibrados.";
+                    mensajeAjuste = "F2 = 0: el alimento de ajuste no produce diferencia. " +
+                        "Elija otro ingrediente.";
                 }
+            } else if (litrosEnl > 0 && litrosProt > 0
+                    && Math.abs(litrosEnl - litrosProt) <= 0.01) {
+                mensajeAjuste = "Los litros con energia y proteina estan equilibrados.";
             }
 
-            // -------  Actualizar etiquetas en pantalla -----------------------
+            // ==================================================
+            // ACTUALIZAR ETIQUETAS EN PANTALLA
+            // ==================================================
             lblResMantenimiento.setText(String.format(
-                "Mant.: ENL=%.2f MJ  Prot=%.0f g  Minerales: Ca=%.1f P=%.1f Mg=%.1f Na=%.1f g",
+                "Mant: ENL=%.2f MJ  Prot=%.0f g  |  Min: Ca=%.1f P=%.1f Mg=%.1f Na=%.1f g",
                 enlMant, protMant, rCa, rP, rMg, rNa));
             lblResRacion.setText(String.format(
-                "Racion: ENL=%.2f MJ  Prot=%.0f g  |  Disponible: ENL=%.2f MJ  Prot=%.0f g",
-                enlRacion, protRacion, enlDisp, protDisp));
+                "Racion: ENL=%.2f MJ  Prot=%.0f g",
+                enlRacion, protRacion));
+            lblResDisponible.setText(String.format(
+                "Disponible producir: ENL=%.2f MJ  Prot=%.0f g",
+                enlDisp, protDisp));
             lblResLitros.setText(String.format(
-                "Litros: con energia=%.2f  con proteina=%.2f  |  Final (tras ajuste): ENL=%.2f  Prot=%.2f",
-                litrosConEnl, litrosConProt, litrosFinalEnl, litrosFinalProt));
+                "Litros: con energia=%.2f  /  con proteina=%.2f",
+                litrosEnl, litrosProt));
             lblResAjuste.setText(mensajeAjuste);
+            lblResFinal.setText(ajusteHecho ? String.format(
+                "Tras ajuste: litros energia=%.2f  litros proteina=%.2f  (produccion estimada: %.2f L)",
+                litrosEnlFin, litrosProtFin, litrosEnlFin) : "");
 
-            // ------- Mapa de resultados para la JTable ----------------------
-            ultimosResultados.put("Peso Vivo",                    String.format("%.2f Kg", pesoKg));
-            ultimosResultados.put("Peso Metabolico (PV^0.75)",    String.format("%.4f", pm));
-            ultimosResultados.put("Litros de leche/dia",          String.format("%.1f litros", litros));
-            ultimosResultados.put("% Grasa leche / Tipo",         String.format("%.1f%% / %s", grasaPct, nomTipo));
-            ultimosResultados.put("MJ ENL requeridos/litro",      String.format("%.2f MJ", mjPorLitro));
-            ultimosResultados.put("Proteina requerida/litro",     String.format("%.0f g", protPorLitro));
-            ultimosResultados.put("REQUERIMIENTOS DE MANTENIMIENTO", "");
-            ultimosResultados.put("Energia mantenimiento",        String.format("%.4f MJ ENL", enlMant));
-            ultimosResultados.put("Proteina mantenimiento",       String.format("%.2f g", protMant));
-            ultimosResultados.put("Calcio (Ca) requerido",        String.format("%.2f g  (litros * 3.2)", rCa));
-            ultimosResultados.put("Fosforo (P) requerido",        String.format("%.2f g  (litros * 1.7)", rP));
-            ultimosResultados.put("Magnesio (Mg) requerido",      String.format("%.2f g  (litros * 0.6)", rMg));
-            ultimosResultados.put("Sodio (Na) requerido",         String.format("%.2f g  (litros * 0.6)", rNa));
-            ultimosResultados.put("ANALISIS DE LA RACION",        "");
+            // ==================================================
+            // POBLAR MAPA PARA LA JTABLE
+            // ==================================================
+            ultimosResultados.put("Peso Vivo",                     String.format("%.2f Kg", pesoKg));
+            ultimosResultados.put("Litros de leche / dia",         String.format("%.1f litros", litros));
+            ultimosResultados.put("% Grasa / Tipo de leche",       String.format("%.1f%% -> %s", grasaPct, nomTipo));
 
-            for (int i = 0; i < 3; i++) {
-                String tKg = txtKgIng[i].getText().trim().replace(",",".");
-                String tPc = txtPcPctIng[i].getText().trim().replace(",",".");
-                String tMj = txtMjIng[i].getText().trim().replace(",",".");
-                if (tKg.isEmpty() || tPc.isEmpty() || tMj.isEmpty()) continue;
-                double kg  = Double.parseDouble(tKg);
-                if (kg <= 0) continue;
-                double pc  = Double.parseDouble(tPc);
-                double mj  = Double.parseDouble(tMj);
-                ultimosResultados.put("Ingrediente " + (i+1) + " (" + String.format("%.1f",kg) + " Kg)",
-                    String.format("ENL=%.2f MJ  Prot=%.0f g  (%.1f%% PC, %.2f MJ/Kg)",
-                        kg*mj, kg*pcPctAGramos(pc), pc, mj));
+            ultimosResultados.put("PASO 2 - MANTENIMIENTO",        "");
+            ultimosResultados.put("  Peso Metabolico (PV^0.75)",   String.format("%.2f ^ 0.75 = %.4f", pesoKg, pm));
+            ultimosResultados.put("  Energia ENL = PM * 0.293",    String.format("%.4f * 0.293 = %.4f MJ ENL", pm, enlMant));
+            if (pesoKg <= 500.0) {
+                ultimosResultados.put("  Proteina mant (proporcional)", String.format("425 * (%.1f/500) = %.2f g", pesoKg, protMant));
+            } else {
+                ultimosResultados.put("  Proteina mant (500kg base)", String.format("425 + (%.1f-500)*0.5 = %.2f g", pesoKg, protMant));
             }
+            ultimosResultados.put("  Calcio  (litros * 3.2)",     String.format("%.1f * 3.2 = %.2f g", litros, rCa));
+            ultimosResultados.put("  Fosforo (litros * 1.7)",     String.format("%.1f * 1.7 = %.2f g", litros, rP));
+            ultimosResultados.put("  Magnesio(litros * 0.6)",     String.format("%.1f * 0.6 = %.2f g", litros, rMg));
+            ultimosResultados.put("  Sodio   (litros * 0.6)",     String.format("%.1f * 0.6 = %.2f g", litros, rNa));
 
-            ultimosResultados.put("Total racion: Energia",       String.format("%.4f MJ ENL", enlRacion));
-            ultimosResultados.put("Total racion: Proteina",       String.format("%.2f g", protRacion));
-            ultimosResultados.put("EVALUACION DE LA RACION",      "");
-            ultimosResultados.put("Energia disponible producir",  String.format("%.4f MJ ENL", enlDisp));
-            ultimosResultados.put("Proteina disponible producir", String.format("%.2f g", protDisp));
-            ultimosResultados.put("Litros producibles (energia)", String.format("%.4f litros", litrosConEnl));
-            ultimosResultados.put("Litros producibles (proteina)",String.format("%.4f litros", litrosConProt));
+            ultimosResultados.put("PASO 3 - TIPO DE LECHE",        "");
+            ultimosResultados.put("  MJ ENL requeridos por litro", String.format("%.2f MJ", mjPorLitro));
+            ultimosResultados.put("  Proteina requerida por litro",String.format("%.0f g", gPorLitro));
 
-            if (ajusteRealizado) {
-                ultimosResultados.put("AJUSTE F1/F2",             "");
-                ultimosResultados.put("F1 (diferencia litros)",   String.format("%.4f litros", f1));
-                ultimosResultados.put("Kg de alimento a agregar", String.format("%.4f Kg", kgAjuste));
-                ultimosResultados.put("Litros finales (energia)", String.format("%.4f litros", litrosFinalEnl));
-                ultimosResultados.put("Litros finales (proteina)",String.format("%.4f litros", litrosFinalProt));
-                ultimosResultados.put("Produccion estimada",      String.format("%.2f litros (por energia)", litrosFinalEnl));
-            } else if (!tAjPc.isEmpty()) {
-                ultimosResultados.put("AJUSTE F1/F2",             mensajeAjuste);
+            ultimosResultados.put("PASO 4 - ANALISIS DE RACION",   "");
+            for (int i = 0; i < MAX_ING; i++) {
+                int selIdx = cbIngrediente[i].getSelectedIndex();
+                if (selIdx == 0) continue;
+                String tKg = txtKgIng[i].getText().trim().replace(",", ".");
+                if (tKg.isEmpty()) continue;
+                double kg = Double.parseDouble(tKg);
+                if (kg <= 0) continue;
+                double pcPct = DB_ING[selIdx][0];
+                double mj    = DB_ING[selIdx][1];
+                ultimosResultados.put("  Ing " + (i+1) + " - " + NOMBRES_ING[selIdx].trim(),
+                    String.format("%.1f Kg * %.2f MJ = %.2f MJ  |  %.1f Kg * %.0f g = %.0f g",
+                        kg, mj, kg*mj, kg, pcPctAGkg(pcPct), kg*pcPctAGkg(pcPct)));
+            }
+            ultimosResultados.put("  Total racion - Energia",     String.format("%.4f MJ ENL", enlRacion));
+            ultimosResultados.put("  Total racion - Proteina",    String.format("%.2f g", protRacion));
+
+            ultimosResultados.put("PASO 5 - EVALUACION",          "");
+            ultimosResultados.put("  Disponible energia",         String.format("%.4f - %.4f = %.4f MJ", enlRacion,  enlMant,  enlDisp));
+            ultimosResultados.put("  Disponible proteina",        String.format("%.2f - %.2f = %.2f g",  protRacion, protMant, protDisp));
+            ultimosResultados.put("  Litros con energia",         String.format("%.4f / %.2f = %.4f litros", enlDisp,  mjPorLitro, litrosEnl));
+            ultimosResultados.put("  Litros con proteina",        String.format("%.2f / %.0f = %.4f litros", protDisp, gPorLitro,  litrosProt));
+
+            if (ajusteHecho) {
+                ultimosResultados.put("PASO 6 - AJUSTE F1/F2",   "");
+                ultimosResultados.put("  Alimento de ajuste",    NOMBRES_ING[ajusteIdx].trim());
+                ultimosResultados.put("  F1 (dif. litros)",      String.format("%.4f - %.4f = %.4f", litrosProt, litrosEnl, litrosProt - litrosEnl));
+                ultimosResultados.put("  F2 (dif. litros/kg aj.)",String.format("%.4f - %.4f = %.4f",
+                    DB_ING[ajusteIdx][1]/mjPorLitro, pcPctAGkg(DB_ING[ajusteIdx][0])/gPorLitro,
+                    DB_ING[ajusteIdx][1]/mjPorLitro - pcPctAGkg(DB_ING[ajusteIdx][0])/gPorLitro));
+                ultimosResultados.put("  Kg a agregar = F1/F2",  String.format("%.4f Kg", kgAjuste));
+                ultimosResultados.put("  Litros finales energia",String.format("%.4f litros", litrosEnlFin));
+                ultimosResultados.put("  Litros finales proteina",String.format("%.4f litros", litrosProtFin));
+                ultimosResultados.put("  Produccion estimada",   String.format("%.2f litros/dia (base energia)", litrosEnlFin));
+            } else {
+                ultimosResultados.put("PASO 6 - AJUSTE F1/F2",   mensajeAjuste);
             }
 
             return enlMant;
 
         } catch (NumberFormatException nfe) {
             JOptionPane.showMessageDialog(null,
-                "Error: Verifique que todos los campos numericos esten completos\n" +
-                "y usen punto o coma como separador decimal.");
+                "Error: Verifique que todos los campos numericos esten completos.");
             return 0;
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error inesperado: " + e.getMessage());
