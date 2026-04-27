@@ -1,193 +1,350 @@
 package model;
 
 import java.awt.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
 public class Equino extends Animal {
-    // Componentes de Entrada
-    private JTextField txtPesoVivo, txtHenoPct, txtAvenaPct, txtMaizPct, txtNaFuerte;
-    private JComboBox<String> cbUnidadPeso, cbTipoTrabajo;
-    private JLabel lblResultadoEquino;
 
-    // Constantes de Base de Datos extraídas del documento 
-    private final double ED_HENO = 2.10;
-    private final double ED_AVENA = 2.77;
-    private final double ED_MAIZ = 3.27;
+    private JTextField txtPesoVivo;
+    private JTextField txtHenoPct;
+    private JTextField txtAvenaPct;
+    private JTextField txtMaizPct;
+    private JTextField txtNaFuerte;   
+    private JComboBox<String> cbUnidadPeso;
+    private JComboBox<String> cbTipoTrabajo;
 
+    // ─── BASE DE DATOS NUTRICIONAL ───
+    // Columnas: { Grasa(g), ED(Mcal), Prot(g), Ca(g), P(g), Mg(g), Na(g), Cl(g), K(g) }
+    private static final double[] DB_HENO  = {2.70, 2.10, 8.4, 7.20, 0.22, 0.17, 0.04, 0.19, 0.20};
+    private static final double[] DB_AVENA = {4.70, 2.77, 8.6, 1.10, 0.31, 0.13, 0.05, 0.04, 0.30};
+    private static final double[] DB_MAIZ  = {4.11, 3.27, 6.7, 0.40, 0.29, 0.09, 0.03, 0.06, 0.30};
+
+    private static final int I_GRASA = 0, I_ED = 1, I_PROT = 2,
+                             I_CA = 3, I_P  = 4, I_MG  = 5,
+                             I_NA = 6, I_CL = 7, I_K   = 8;
+
+    // ─── Mapa de resultados─────────────
+    private Map<String, String> ultimosResultados = new LinkedHashMap<>();
+
+    // ─────────────────────────────────────────────────────────────
+    //  CONSTRUCTOR – Componentes
+    // ─────────────────────────────────────────────────────────────
     public Equino(double peso, String unidad) {
         super("Equino", peso, unidad);
-        txtPesoVivo = new JTextField();
-        txtHenoPct = new JTextField("70"); // Proporción ejemplo [cite: 147]
-        txtAvenaPct = new JTextField("15");
-        txtMaizPct = new JTextField("15");
-        txtNaFuerte = new JTextField(""); // Para ingreso manual en trabajo fuerte [cite: 144]
-        
-        cbUnidadPeso = new JComboBox<>(new String[]{"Kg", "Lb"});
+
+        // Campos de texto
+        txtPesoVivo = new JTextField(8);
+        txtHenoPct  = new JTextField("70", 5);
+        txtAvenaPct = new JTextField("15", 5);
+        txtMaizPct  = new JTextField("15", 5);
+        txtNaFuerte = new JTextField(6);
+
+        // Combos
+        cbUnidadPeso  = new JComboBox<>(new String[]{"Kg", "Lb"});
         cbTipoTrabajo = new JComboBox<>(new String[]{
-            "Mantenimiento", "Trabajo moderado", "Trabajo medio", "Trabajo fuerte", "Trabajo muy fuerte"
+            "Mantenimiento", "Trabajo moderado", "Trabajo medio",
+            "Trabajo fuerte", "Trabajo muy fuerte"
         });
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  PANEL VISUAL DE ENTRADA DE DATOS
+    // ─────────────────────────────────────────────────────────────
     @Override
     public JPanel obtenerPanelPrincipal() {
-        JPanel panelContenedor = new JPanel();
-        panelContenedor.setLayout(new BorderLayout(10, 10));
+        JPanel contenedor = new JPanel(new BorderLayout(8, 8));
+        contenedor.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
-        // --- PARTE SUPERIOR: BASE DE DATOS (Tabla integrada)  ---
-        JPanel panelSuperior = new JPanel(new BorderLayout());
-        String[] colDB = {"Alimento", "ED (Mcal)", "Prot (g)", "Ca (g)", "P (g)", "Mg (g)", "Na (g)", "Cl (g)", "K (g)"};
+        // ── Tabla de Base de Datos Nutricional ────────────────────
+        String[] colDB = {"Alimento","Grasa(g)","ED(Mcal)","Prot(g)",
+                          "Ca(g)","P(g)","Mg(g)","Na(g)","Cl(g)","K(g)"};
         Object[][] dataDB = {
-            {"Heno", 2.10, 8.4, 7.2, 0.22, 0.17, 0.04, 0.19, 0.2},
-            {"Avena", 2.77, 8.6, 1.1, 0.31, 0.13, 0.05, 0.04, 0.3},
-            {"Maíz", 3.27, 6.7, 0.4, 0.29, 0.09, 0.03, 0.06, 0.3}
+            {"Heno",  2.70, 2.10, 8.4, 7.20, 0.22, 0.17, 0.04, 0.19, 0.20},
+            {"Avena", 4.70, 2.77, 8.6, 1.10, 0.31, 0.13, 0.05, 0.04, 0.30},
+            {"Maíz",  4.11, 3.27, 6.7, 0.40, 0.29, 0.09, 0.03, 0.06, 0.30}
         };
-        JTable tablaDB = new JTable(new DefaultTableModel(dataDB, colDB));
-        tablaDB.setEnabled(false); // Solo lectura
+        DefaultTableModel modeloDB = new DefaultTableModel(dataDB, colDB);
+        JTable tablaDB = new JTable(modeloDB);
+        tablaDB.setEnabled(false);   // Solo lectura
+        tablaDB.setRowHeight(22);
+        tablaDB.getTableHeader().setReorderingAllowed(false);
         JScrollPane scrollDB = new JScrollPane(tablaDB);
-        scrollDB.setPreferredSize(new Dimension(850, 100));
-        
-        panelSuperior.add(new JLabel("  Base de Datos de Referencia (Aportes por Kg):"), BorderLayout.NORTH);
-        panelSuperior.add(scrollDB, BorderLayout.CENTER);
+        scrollDB.setPreferredSize(new Dimension(860, 88));
+        scrollDB.setBorder(BorderFactory.createTitledBorder(
+            "Base de Datos de Referencia – Aportes por Kg de Alimento"));
 
-        // --- PARTE CENTRAL: ENTRADAS DE DATOS ---
-        JPanel panelCentral = new JPanel();
-        panelCentral.setLayout(new BoxLayout(panelCentral, BoxLayout.Y_AXIS));
-        
-        panelCentral.add(crearFila("Peso vivo del caballo:", txtPesoVivo, cbUnidadPeso));
-        panelCentral.add(crearFila("Nivel de Actividad Física:", new JLabel("Tipo:"), cbTipoTrabajo));
-        
-        JPanel dietaPanel = new JPanel(new GridLayout(3, 2, 5, 2));
-        dietaPanel.setBorder(BorderFactory.createTitledBorder("Distribución de la Ración (%)"));
-        dietaPanel.add(new JLabel("% Heno:")); dietaPanel.add(txtHenoPct);
-        dietaPanel.add(new JLabel("% Avena:")); dietaPanel.add(txtAvenaPct);
-        dietaPanel.add(new JLabel("% Maíz:")); dietaPanel.add(txtMaizPct);
-        panelCentral.add(dietaPanel);
+        // ── Panel de entradas del caballo ────────────────────────
+        JPanel panelEntradas = new JPanel();
+        panelEntradas.setLayout(new BoxLayout(panelEntradas, BoxLayout.Y_AXIS));
+        panelEntradas.setBorder(BorderFactory.createTitledBorder("Datos del Caballo"));
 
-        panelCentral.add(crearFila("Sodio Manual (Solo Trabajo Fuerte):", txtNaFuerte, new JLabel("gr")));
+        // Peso vivo + unidad
+        panelEntradas.add(crearFila("Peso vivo:", txtPesoVivo, cbUnidadPeso));
 
-        // --- PARTE INFERIOR: RESULTADOS DETALLADOS ---
-        lblResultadoEquino = new JLabel("<html><body><font color='blue'>Complete los campos y presione 'Realizar Cálculo'</font></body></html>");
-        JScrollPane scrollRes = new JScrollPane(lblResultadoEquino);
-        scrollRes.setPreferredSize(new Dimension(400, 250));
-        scrollRes.setBorder(BorderFactory.createTitledBorder("Análisis de Requerimientos y Ración"));
+        //  Tipo de actividad
+        panelEntradas.add(crearFila("Tipo de actividad:", new JLabel("Nivel:"), cbTipoTrabajo));
 
-        panelContenedor.add(panelSuperior, BorderLayout.NORTH);
-        panelContenedor.add(panelCentral, BorderLayout.CENTER);
-        panelContenedor.add(scrollRes, BorderLayout.SOUTH);
+        // Sub-panel de distribución de la ración
+        JPanel panelRacion = new JPanel(new GridLayout(4, 3, 5, 3));
+        panelRacion.setBorder(BorderFactory.createTitledBorder(
+            "Distribución de la Ración (%)  – debe sumar 100%"));
+        panelRacion.add(new JLabel("% Heno:"));
+        panelRacion.add(txtHenoPct);
+        panelRacion.add(new JLabel("(forraje principal)"));
+        panelRacion.add(new JLabel("% Avena:"));
+        panelRacion.add(txtAvenaPct);
+        panelRacion.add(new JLabel("(concentrado)"));
+        panelRacion.add(new JLabel("% Maíz:"));
+        panelRacion.add(txtMaizPct);
+        panelRacion.add(new JLabel("(concentrado)"));
+        panelRacion.add(new JLabel("Na manual (solo Trabajo fuerte):"));
+        panelRacion.add(txtNaFuerte);
+        panelRacion.add(new JLabel("g/día  (opcional)"));
+        panelEntradas.add(panelRacion);
 
-        return panelContenedor;
+        // Nota informativa
+        JLabel nota = new JLabel("  * En Trabajo fuerte/muy fuerte el Na puede ser hasta 25 g/100 kg; déjelo vacío para usar ese máximo.");
+        nota.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        nota.setForeground(Color.GRAY);
+        panelEntradas.add(nota);
+
+        contenedor.add(scrollDB,      BorderLayout.NORTH);
+        contenedor.add(panelEntradas, BorderLayout.CENTER);
+        return contenedor;
     }
 
-    private JPanel crearFila(String titulo, JComponent campo, JComponent dimensional) {
+    private JPanel crearFila(String titulo, JComponent campo, JComponent unidad) {
         JPanel p = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(2, 5, 2, 5); gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0; gbc.weightx = 0.3; p.add(new JLabel(titulo), gbc);
-        gbc.gridx = 1; gbc.weightx = 0.4; p.add(campo, gbc);
-        gbc.gridx = 2; gbc.weightx = 0.3; p.add(dimensional, gbc);
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(3, 5, 3, 5);
+        g.fill = GridBagConstraints.HORIZONTAL;
+
+        g.gridx = 0; g.weightx = 0.35; p.add(new JLabel(titulo), g);
+        g.gridx = 1; g.weightx = 0.40; p.add(campo, g);
+        g.gridx = 2; g.weightx = 0.25; p.add(unidad, g);
         return p;
     }
 
-    private double aKg(double v) {
-        // Conversión según documento 1kg = 2.2 lb [cite: 170]
-        return cbUnidadPeso.getSelectedItem().equals("Lb") ? v / 2.2 : v;
+    //-----------------------------------------------------CÁLCULOS------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    //  Conversión de peso a Kg según combo seleccionado
+    // ─────────────────────────────────────────────────────────────
+    private double aKg(double valor) {
+        return "Lb".equals(cbUnidadPeso.getSelectedItem()) ? valor / 2.2 : valor;
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  Peso metabólico: PesoVivo^0.75
+    // ─────────────────────────────────────────────────────────────
     @Override
     public double calcularPesoMetabolico() {
         try {
+            //LECTURA DE DATO
             double kg = aKg(Double.parseDouble(txtPesoVivo.getText().trim().replace(",", ".")));
-            return Math.pow(kg, 0.75); // Fórmula: Peso^0.75 [cite: 115]
-        } catch (Exception e) { return 0; }
+            // CÁLCULO
+            return Math.pow(kg, 0.75);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  CÁLCULO PRINCIPAL – retorna ED total en Mcal
+    // ─────────────────────────────────────────────────────────────
     @Override
     public double calcularRequerimientoEnergia() {
+        ultimosResultados.clear();
         try {
-            double pesoKg = aKg(Double.parseDouble(txtPesoVivo.getText().trim().replace(",", ".")));
-            double wkg = calcularPesoMetabolico();
+            // ── PASO 1: Datos base ────────────────────────────────
+            double pesoKg = aKg(Double.parseDouble(
+                    txtPesoVivo.getText().trim().replace(",", ".")));
+            if (pesoKg <= 0) {
+                JOptionPane.showMessageDialog(null, "El peso debe ser mayor a 0.");
+                return 0;
+            }
+            // Peso metabólico (Wkg)
+            double wkg    = Math.pow(pesoKg, 0.75);
             String trabajo = (String) cbTipoTrabajo.getSelectedItem();
 
-            // 1. CÁLCULO DE ENERGÍA DIGESTIBLE (ED)
-            // ED Mantenimiento: Wkg * 0.155 [cite: 118]
-            double edMantMcal = wkg * 0.155;
-            double edMantMJ = wkg * 0.6; // [cite: 117]
+            // ── Energía de Mantenimiento ─────────────────
+            double edMantMJ   = wkg * 0.6;     // en MegaJoules
+            double edMantMcal = wkg * 0.155;   // en Megacalorías
 
-            // ED Ejercicio: Ajuste según tabla de actividad [cite: 134]
-            double factor = 1.0;
-            if (trabajo.equals("Trabajo moderado")) factor = 1.2;
-            else if (trabajo.equals("Trabajo medio")) factor = 1.4;
-            else if (trabajo.equals("Trabajo fuerte")) factor = 1.6;
-            else if (trabajo.equals("Trabajo muy fuerte")) factor = 1.9;
-
+            // ── Factor de ejercicio y ED Total ────────────
+            double factor;
+            switch (trabajo) {
+                case "Trabajo moderado":   factor = 1.2; break;
+                case "Trabajo medio":      factor = 1.4; break;
+                case "Trabajo fuerte":     factor = 1.6; break;
+                case "Trabajo muy fuerte": factor = 1.9; break;
+                default:                   factor = 1.0; break; // Mantenimiento
+            }
+            // ED total = ED mantenimiento × factor de actividad
             double edTotalMcal = edMantMcal * factor;
-            double edTotalMJ = edTotalMcal * 4.19; // Conversión: 1 Mcal = 4.19 MJ [cite: 139]
+            // Convertir Mcal → MJ  (1 Mcal = 4.19 MJ)
+            double edTotalMJ   = edTotalMcal * 4.19;
 
-            // 2. REQUERIMIENTO DE PROTEÍNA (CHON) [cite: 140]
-            // Fórmula: Energía total Mcal * 19.4
-            double proteinaGramos = edTotalMcal * 19.4;
+            // ── Proteína (CHON) ───────────────────────────
+            // Fórmula: ED total (Mcal) × 19.4 = gramos CHON/día
+            double chonReqG = edTotalMcal * 19.4;
 
-            // 3. REQUERIMIENTO DE MINERALES (Regla de 3 por cada 100Kg de peso) 
+            // ── Minerales por regla de 3 (base 100 kg PV) ─
+            // f100 = factor de escala respecto a 100 kg
             double f100 = pesoKg / 100.0;
             double rCa, rP, rMg, rNa, rK, rCl;
 
-            if (trabajo.equals("Mantenimiento")) {
-                rCa = 5 * f100; rP = 3 * f100; rMg = 2 * f100; rNa = 2 * f100; rK = 5 * f100; rCl = 2 * f100;
-            } else if (trabajo.equals("Trabajo medio")) {
-                rCa = 5.7 * f100; rP = 3.8 * f100; rMg = 2.7 * f100; rNa = 10 * f100; rK = 8.8 * f100; rCl = 14 * f100;
-            } else if (trabajo.contains("fuerte")) {
-                rCa = 6.7 * f100; rP = 4.9 * f100; rMg = 3.7 * f100;
-                rNa = txtNaFuerte.getText().isEmpty() ? 25 * f100 : Double.parseDouble(txtNaFuerte.getText());
-                rK = 15 * f100; rCl = 35 * f100;
-            } else { // Trabajo moderado/leve
-                rCa = 5.2 * f100; rP = 3.2 * f100; rMg = 2.2 * f100; rNa = 3.9 * f100; rK = 5.9 * f100; rCl = 5.1 * f100;
+            switch (trabajo) {
+                case "Trabajo moderado":
+                    rCa = 5.2 * f100; rP  = 3.2 * f100; rMg = 2.2 * f100;
+                    rNa = 3.9 * f100; rK  = 5.9 * f100; rCl = 5.1 * f100;
+                    break;
+                case "Trabajo medio":
+                    rCa = 5.7 * f100; rP  = 3.8 * f100; rMg = 2.7 * f100;
+                    rNa = 10.0* f100; rK  = 8.8 * f100; rCl = 14.0* f100;
+                    break;
+                case "Trabajo fuerte":
+                case "Trabajo muy fuerte":
+                    rCa = 6.7 * f100; rP  = 4.9 * f100; rMg = 3.7 * f100;
+                    // Na: el usuario puede ingresar valor manual; si no, usar 25 g/100 kg
+                    String naText = txtNaFuerte.getText().trim().replace(",", ".");
+                    rNa = naText.isEmpty() ? 25.0 * f100
+                                           : Double.parseDouble(naText);
+                    rK  = 15.0 * f100; rCl = 35.0 * f100;
+                    break;
+                default: // Mantenimiento
+                    rCa = 5.0 * f100; rP  = 3.0 * f100; rMg = 2.0 * f100;
+                    rNa = 2.0 * f100; rK  = 5.0 * f100; rCl = 2.0 * f100;
+                    break;
             }
 
-            // 4. CÁLCULO DE LA RACIÓN PROPUESTA [cite: 147-150]
-            double hPct = Double.parseDouble(txtHenoPct.getText()) / 100.0;
-            double aPct = Double.parseDouble(txtAvenaPct.getText()) / 100.0;
-            double mPct = Double.parseDouble(txtMaizPct.getText()) / 100.0;
+            // ──  Ración – porcentajes de cada ingrediente ──
+            double hPct = parsePct(txtHenoPct)  / 100.0;
+            double aPct = parsePct(txtAvenaPct) / 100.0;
+            double mPct = parsePct(txtMaizPct)  / 100.0;
 
-            double kgHeno = (edTotalMcal * hPct) / ED_HENO;
-            double kgAvena = (edTotalMcal * aPct) / ED_AVENA;
-            double kgMaiz = (edTotalMcal * mPct) / ED_MAIZ;
-            double totalAlimentoKg = kgHeno + kgAvena + kgMaiz;
+            // Validar que los porcentajes sumen 100 %
+            double sumPct = hPct + aPct + mPct;
+            if (Math.abs(sumPct - 1.0) > 0.01) {
+                JOptionPane.showMessageDialog(null,
+                    "Los porcentajes de la ración deben sumar 100% (actual: "
+                    + String.format("%.1f", sumPct * 100) + "%)");
+                return 0;
+            }
 
-            // 5. VERIFICACIÓN DE REGLAS CRÍTICAS [cite: 155-163]
-            double minHeno = 0.5 * f100;
-            double maxConc = 0.4 * f100;
+            // ED que debe aportar cada ingrediente según su porcentaje:
+            double edHeno  = edTotalMcal * hPct;
+            double edAvena = edTotalMcal * aPct;
+            double edMaiz  = edTotalMcal * mPct;
+
+            // Kg necesarios de cada ingrediente:
+            //   Si 1 Kg de heno aporta DB_HENO[I_ED] Mcal → necesito edHeno/DB_HENO[I_ED] Kg
+            double kgHeno  = edHeno  / DB_HENO [I_ED];
+            double kgAvena = edAvena / DB_AVENA[I_ED];
+            double kgMaiz  = edMaiz  / DB_MAIZ [I_ED];
+            double kgTotal = kgHeno + kgAvena + kgMaiz;
+
+            // ── Aporte nutricional de la ración propuesta ─
+            // Proteína: regla de 3 con la base de datos (g/kg)
+            double aporteProtH = kgHeno  * DB_HENO [I_PROT];
+            double aporteProtA = kgAvena * DB_AVENA[I_PROT];
+            double aporteProtM = kgMaiz  * DB_MAIZ [I_PROT];
+            double aporteProt  = aporteProtH + aporteProtA + aporteProtM;
+
+            // Minerales: misma lógica para cada mineral
+            double aCa = kg(kgHeno,kgAvena,kgMaiz, I_CA);
+            double aP  = kg(kgHeno,kgAvena,kgMaiz, I_P);
+            double aMg = kg(kgHeno,kgAvena,kgMaiz, I_MG);
+            double aNa = kg(kgHeno,kgAvena,kgMaiz, I_NA);
+            double aCl = kg(kgHeno,kgAvena,kgMaiz, I_CL);
+            double aK  = kg(kgHeno,kgAvena,kgMaiz, I_K);
+
+            // ── Verificación de reglas críticas ───────────
+            // Regla 1: mínimo 0.5 kg de heno por cada 100 kg PV
+            double minHeno  = 0.5  * f100;
+            // Regla 2: máximo 0.4 kg de granos (avena+maíz) por cada 100 kg PV
+            double maxConc  = 0.4  * f100;
+            // Regla 3: consumo máximo = 2% del peso vivo (Materia Seca)
             double msLimite = pesoKg * 0.02;
+            double concTotal = kgAvena + kgMaiz;
 
-            // GENERACIÓN DEL REPORTE DETALLADO (HTML)
-            StringBuilder res = new StringBuilder("<html><body style='width:350px'>");
-            res.append("<b>1. PESO METABÓLICO:</b> ").append(String.format("%.2f", wkg)).append(" Wkg<sup>0.75</sup><br><br>");
-            res.append("<b>2. REQUERIMIENTOS TOTALES:</b><br>");
-            res.append("- Energía (ED): ").append(String.format("%.2f Mcal (%.2f MJ)", edTotalMcal, edTotalMJ)).append("<br>");
-            res.append("- Proteína (CHON): ").append(String.format("%.2f g", proteinaGramos)).append("<br>");
-            res.append("- Minerales (g/día):<br>");
-            res.append("&nbsp;&nbsp;Ca: ").append(String.format("%.1f", rCa)).append(" | P: ").append(String.format("%.1f", rP))
-               .append(" | Mg: ").append(String.format("%.1f", rMg)).append("<br>");
-            res.append("&nbsp;&nbsp;Na: ").append(String.format("%.1f", rNa)).append(" | K: ").append(String.format("%.1f", rK))
-               .append(" | Cl: ").append(String.format("%.1f", rCl)).append("<br><br>");
-            
-            res.append("<b>3. RACIÓN PROPUESTA:</b><br>");
-            res.append("- Heno: ").append(String.format("%.2f Kg", kgHeno)).append("<br>");
-            res.append("- Avena: ").append(String.format("%.2f Kg", kgAvena)).append("<br>");
-            res.append("- Maíz: ").append(String.format("%.2f Kg", kgMaiz)).append("<br><br>");
+            String vHeno = kgHeno   >= minHeno  ? "ADECUADA " : "NO ADECUADA ";
+            String vConc = concTotal <= maxConc  ? "ADECUADA " : "NO ADECUADA ";
+            String vMS   = kgTotal  <= msLimite  ? "ADECUADA " : "NO ADECUADA ";
 
-            res.append("<b>4. VERIFICACIÓN DE RACIÓN:</b><br>");
-            res.append("- Mín. Heno (").append(String.format("%.1f", minHeno)).append(" Kg): ").append(kgHeno >= minHeno ? "ADECUADA" : "NO ADECUADA").append("<br>");
-            res.append("- Máx. Concentrado (").append(String.format("%.1f", maxConc)).append(" Kg): ").append((kgAvena+kgMaiz) <= maxConc ? "ADECUADA" : "NO ADECUADA").append("<br>");
-            res.append("- Límite Consumo MS (").append(String.format("%.1f", msLimite)).append(" Kg): ").append(totalAlimentoKg <= msLimite ? "ADECUADA" : "NO ADECUADA");
-            res.append("</body></html>");
+            // ── Construir mapa de resultados para la JTable ─
+            ultimosResultados.put("Peso Vivo",                    String.format("%.2f Kg", pesoKg));
+            ultimosResultados.put("Peso Metabólico (Wkg^0.75)",   String.format("%.4f Wkg", wkg));
+            ultimosResultados.put("ENERGÍA",                    "────────────────────");
+            ultimosResultados.put("ED Mantenimiento",             String.format("%.4f Mcal  /  %.4f MJ", edMantMcal, edMantMJ));
+            ultimosResultados.put("Factor actividad (" + trabajo + ")", "× " + factor);
+            ultimosResultados.put("ED Total",                     String.format("%.4f Mcal  /  %.4f MJ", edTotalMcal, edTotalMJ));
+            ultimosResultados.put("PROTEÍNA",                   "────────────────────");
+            ultimosResultados.put("Req. CHON (g/día)",            String.format("%.2f g", chonReqG));
+            ultimosResultados.put("Aporte CHON de la ración",     String.format("%.2f g", aporteProt));
+            ultimosResultados.put("Diferencia CHON",              String.format("%.2f g  %s", aporteProt - chonReqG,
+                                                                    (aporteProt >= chonReqG) ? "✔" : "✘"));
+            ultimosResultados.put("MINERALES – Requerido / Aportado", "────────────────────");
+            ultimosResultados.put("Calcio (Ca)  g/día",           String.format("%.2f / %.2f  %s", rCa, aCa, check(aCa, rCa)));
+            ultimosResultados.put("Fósforo (P)  g/día",           String.format("%.2f / %.2f  %s", rP,  aP,  check(aP,  rP)));
+            ultimosResultados.put("Magnesio (Mg) g/día",          String.format("%.2f / %.2f  %s", rMg, aMg, check(aMg, rMg)));
+            ultimosResultados.put("Sodio (Na)   g/día",           String.format("%.2f / %.2f  %s", rNa, aNa, check(aNa, rNa)));
+            ultimosResultados.put("Cloro (Cl)   g/día",           String.format("%.2f / %.2f  %s", rCl, aCl, check(aCl, rCl)));
+            ultimosResultados.put("Potasio (K)  g/día",           String.format("%.2f / %.2f  %s", rK,  aK,  check(aK,  rK)));
+            ultimosResultados.put("RACIÓN PROPUESTA",           "────────────────────");
+            ultimosResultados.put("Heno  (" + pct(hPct) + ")",   String.format("%.4f Kg", kgHeno));
+            ultimosResultados.put("Avena (" + pct(aPct) + ")",   String.format("%.4f Kg", kgAvena));
+            ultimosResultados.put("Maíz  (" + pct(mPct) + ")",   String.format("%.4f Kg", kgMaiz));
+            ultimosResultados.put("Total alimento",               String.format("%.4f Kg", kgTotal));
+            ultimosResultados.put("VERIFICACIÓN DE LA RACIÓN",  "────────────────────");
+            ultimosResultados.put("Mín. Heno  (≥ " + String.format("%.2f", minHeno)  + " Kg)", vHeno);
+            ultimosResultados.put("Máx. Conc. (≤ " + String.format("%.2f", maxConc)  + " Kg)", vConc);
+            ultimosResultados.put("Límite MS   (≤ " + String.format("%.2f", msLimite) + " Kg)", vMS);
 
-            lblResultadoEquino.setText(res.toString());
             return edTotalMcal;
 
+        } catch (NumberFormatException nfe) {
+            JOptionPane.showMessageDialog(null,
+                "Error: Verifique que todos los campos numéricos estén completos\n" +
+                "y usen punto o coma como separador decimal.");
+            return 0;
         } catch (Exception e) {
-            lblResultadoEquino.setText("<html><font color='red'>Error: Verifique que los campos numéricos no estén vacíos.</font></html>");
+            JOptionPane.showMessageDialog(null, "Error inesperado: " + e.getMessage());
             return 0;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  Helpers internos
+    // ─────────────────────────────────────────────────────────────
+
+    /** Suma el aporte de un mineral para heno+avena+maíz dado su índice. */
+    private double kg(double kH, double kA, double kM, int idx) {
+        return kH * DB_HENO[idx] + kA * DB_AVENA[idx] + kM * DB_MAIZ[idx];
+    }
+
+    /** Parsea el texto de un JTextField como porcentaje. */
+    private double parsePct(JTextField tf) {
+        return Double.parseDouble(tf.getText().trim().replace(",", "."));
+    }
+
+    /** Formatea un factor como porcentaje legible. */
+    private String pct(double f) {
+        return String.format("%.0f%%", f * 100);
+    }
+
+    /** Devuelve ✔ si el aporte cubre el requerimiento, ✘ si no. */
+    private String check(double aporte, double req) {
+        return aporte >= req ? "✔" : "✘";
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  Devuelve el mapa de resultados 
+    // ─────────────────────────────────────────────────────────────
+    @Override
+    public Map<String, String> getResultadosParaTabla() {
+        return ultimosResultados;
     }
 }

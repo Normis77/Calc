@@ -1,142 +1,188 @@
 package model;
 
 import java.awt.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.swing.*;
-
-//---------------------------------------------------------INTERFAZ PARA PORCINO---------------------------------------------------------
 public class Porcino extends Animal {
-    private JTextField txtNumeroCerdos, txtDiasEngorde, txtCantDiaria, txtPesoIngreso, txtPesoEgreso;
-    private JComboBox<String> cbUnidadCantDiaria, cbUnidadPesoIngreso, cbUnidadPesoEgreso, cbUnidadTiempo;
+
+    // ─── Componentes Swing (inicializados UNA VEZ en constructor) ─
+    private JTextField txtNumeroCerdos;
+    private JTextField txtTiempoEngorde;
+    private JTextField txtConsumoDiario;
+    private JTextField txtPesoIngreso;
+    private JTextField txtPesoEgreso;
+
+    private JComboBox<String> cbUnidadTiempo;
+    private JComboBox<String> cbUnidadConsumo;
+    private JComboBox<String> cbUnidadIngreso;
+    private JComboBox<String> cbUnidadEgreso;
+
     private JLabel lblResultadoCA;
 
-    private double resultadoConversionAlimenticia;
+    // ─── Resultado interno ────────────────────────────────────────
+    private double resultadoCA = 0;
 
+    // ─────────────────────────────────────────────────────────────
+    //  CONSTRUCTOR
+    // ─────────────────────────────────────────────────────────────
     public Porcino(double peso, String unidad) {
         super("Porcino", peso, unidad);
-        // Inicialización de campos 
-        txtNumeroCerdos = new JTextField();
-        txtDiasEngorde = new JTextField();
-        txtCantDiaria = new JTextField();
-        txtPesoIngreso = new JTextField();
-        txtPesoEgreso = new JTextField();
 
-        cbUnidadTiempo = new JComboBox<>(new String[]{"Días", "Meses"});
-        cbUnidadCantDiaria = new JComboBox<>(new String[]{"Kg/día", "Lb/día"});
-        cbUnidadPesoIngreso = new JComboBox<>(new String[]{"Kg", "Lb"});
-        cbUnidadPesoEgreso = new JComboBox<>(new String[]{"Kg", "Lb"});
+        // Todos los componentes se crean UNA SOLA VEZ aquí
+        txtNumeroCerdos  = new JTextField(6);
+        txtTiempoEngorde = new JTextField(6);
+        txtConsumoDiario = new JTextField(6);
+        txtPesoIngreso   = new JTextField(6);
+        txtPesoEgreso    = new JTextField(6);
+
+        cbUnidadTiempo  = new JComboBox<>(new String[]{"Días", "Meses"});
+        cbUnidadConsumo = new JComboBox<>(new String[]{"Kg/día", "Lb/día"});
+        cbUnidadIngreso = new JComboBox<>(new String[]{"Kg", "Lb"});
+        cbUnidadEgreso  = new JComboBox<>(new String[]{"Kg", "Lb"});
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  PANEL VISUAL
+    // ─────────────────────────────────────────────────────────────
     @Override
     public JPanel obtenerPanelPrincipal() {
-        JPanel panelContenedor = new JPanel();
-        panelContenedor.setLayout(new BoxLayout(panelContenedor, BoxLayout.Y_AXIS));
-        panelContenedor.setBorder(BorderFactory.createTitledBorder("Cálculo de Conversión Alimenticia"));
-        
-        panelContenedor.add(crearFila("Número de cerdos:", txtNumeroCerdos, new JLabel("Animales")));
-        panelContenedor.add(crearFila("Tiempo de engorde:", txtDiasEngorde, cbUnidadTiempo));
-        panelContenedor.add(crearFila("Consumo diario:", txtCantDiaria, cbUnidadCantDiaria));
-        panelContenedor.add(crearFila("Peso ingreso total:", txtPesoIngreso, cbUnidadPesoIngreso));
-        panelContenedor.add(crearFila("Peso egreso total:", txtPesoEgreso, cbUnidadPesoEgreso));
-        
-        // Panel de Resultado
-        JPanel panelRes = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panelRes.add(new JLabel("RESULTADO: "));
+        JPanel contenedor = new JPanel();
+        contenedor.setLayout(new BoxLayout(contenedor, BoxLayout.Y_AXIS));
+        contenedor.setBorder(BorderFactory.createTitledBorder(
+            "Cálculo de Conversión Alimenticia – Porcinos"));
+
+        contenedor.add(crearFila("Número de cerdos:",      txtNumeroCerdos,  new JLabel("Animales")));
+        contenedor.add(crearFila("Tiempo de engorde:",     txtTiempoEngorde, cbUnidadTiempo));
+        contenedor.add(crearFila("Consumo diario/animal:", txtConsumoDiario, cbUnidadConsumo));
+        contenedor.add(crearFila("Peso ingreso total:",    txtPesoIngreso,   cbUnidadIngreso));
+        contenedor.add(crearFila("Peso egreso total:",     txtPesoEgreso,    cbUnidadEgreso));
+
+        // Nota opcional
+        JLabel nota = new JLabel("  * Si no existe peso de ingreso, ingresar 0.");
+        nota.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        nota.setForeground(Color.GRAY);
+        contenedor.add(nota);
+
+        // Resultado en pantalla
+        JPanel panelRes = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        panelRes.add(new JLabel("RESULTADO  CA:"));
         lblResultadoCA = new JLabel("Pendiente...");
         lblResultadoCA.setFont(new Font("SansSerif", Font.BOLD, 13));
-        lblResultadoCA.setForeground(new Color(0, 102, 204));
+        lblResultadoCA.setForeground(new Color(0, 100, 200));
         panelRes.add(lblResultadoCA);
-        
-        panelContenedor.add(panelRes);
+        contenedor.add(panelRes);
 
-        return panelContenedor;
+        return contenedor;
     }
 
-    
-    private JPanel crearFila(String titulo, JTextField campo, JComponent dimensional) {
+    // ─────────────────────────────────────────────────────────────
+    //  Fila de formulario reutilizable
+    // ─────────────────────────────────────────────────────────────
+    private JPanel crearFila(String titulo, JTextField campo, JComponent unidad) {
         JPanel p = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
- 
-        gbc.gridx = 0;
-        gbc.weightx = 0.4;
-        p.add(new JLabel(titulo), gbc);
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(4, 6, 4, 6);
+        g.fill = GridBagConstraints.HORIZONTAL;
 
-        gbc.gridx = 1;
-        gbc.weightx = 0.4;
-        campo.setPreferredSize(new Dimension(100, 25));
-        p.add(campo, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0.2;
-        dimensional.setPreferredSize(new Dimension(80, 25));
-        p.add(dimensional, gbc);
-
+        g.gridx = 0; g.weightx = 0.45; p.add(new JLabel(titulo), g);
+        g.gridx = 1; g.weightx = 0.35; campo.setPreferredSize(new Dimension(100, 25)); p.add(campo, g);
+        g.gridx = 2; g.weightx = 0.20; unidad.setPreferredSize(new Dimension(90, 25));  p.add(unidad, g);
         return p;
     }
 
-    private double aKilogramos(double valor, String unidad) {
-        if (unidad.startsWith("Lb")) {
-            return valor / 2.20462;
-        }
-        return valor;
+    // ─────────────────────────────────────────────────────────────
+    //  CONVERSIONES INTERNAS
+    // ─────────────────────────────────────────────────────────────
+
+    /** Convierte peso a Kg según la unidad del ComboBox. */
+    private double aKg(double valor, JComboBox<String> cb) {
+        String u = (String) cb.getSelectedItem();
+        // Cualquier unidad que empiece por "Lb" se divide entre 2.2
+        return (u != null && u.startsWith("Lb")) ? valor / 2.2 : valor;
     }
 
-    @Override
-    public double calcularPesoMetabolico() {
-        return 0;
+    /** Convierte tiempo a Días. */
+    private double aDias(double valor, JComboBox<String> cb) {
+        String u = (String) cb.getSelectedItem();
+        return (u != null && u.equalsIgnoreCase("Meses")) ? valor * 30 : valor;
     }
 
-    // --------------------------------------------------------CÁLCULOS--------------------------------------------------------
-
+    // ─────────────────────────────────────────────────────────────
+    //  CÁLCULO PRINCIPAL
+    // ─────────────────────────────────────────────────────────────
     @Override
     public double calcularRequerimientoEnergia() {
         try {
-            //Parseo de datos ingresados
-            //número de cerdos
-            int nCerdos = Integer.parseInt(txtNumeroCerdos.getText().trim());
-            //tiempo de engorde
-            String textoTiempo = txtDiasEngorde.getText().trim().replace(",", ".");
-            double tiempoIngresado = Double.parseDouble(textoTiempo);
-            String unidadTiempo = (String) cbUnidadTiempo.getSelectedItem();
-            double diasCalculados;
+            // ── Lectura y conversión de datos de entrada ──────────
+            int    nCerdos   = Integer.parseInt(txtNumeroCerdos.getText().trim());
+            double dias      = aDias(
+                Double.parseDouble(txtTiempoEngorde.getText().trim().replace(",", ".")),
+                cbUnidadTiempo);
+            double consumoKg = aKg(
+                Double.parseDouble(txtConsumoDiario.getText().trim().replace(",", ".")),
+                cbUnidadConsumo);
 
-            if (unidadTiempo.equalsIgnoreCase("Meses")) {
-                // Convertimos meses a días ( 30 días)
-                diasCalculados = (double) (tiempoIngresado * 30);
+            // Pesos de egreso e ingreso en Kg
+            double pesoEgresoKg  = aKg(
+                Double.parseDouble(txtPesoEgreso.getText().trim().replace(",", ".")),
+                cbUnidadEgreso);
+            double pesoIngresoKg = aKg(
+                Double.parseDouble(txtPesoIngreso.getText().trim().replace(",", ".")),
+                cbUnidadIngreso);
+
+            // ── Alimento total entregado por animal ────────────────
+            // días × consumo diario por animal
+            double alimentoTotalIndiv = dias * consumoKg;
+
+            // ── Ganancia de peso individual ───────────────────────
+            double gananciaIndiv;
+            if (pesoIngresoKg <= 0) {
+                // Sin peso de ingreso → se usa solo el egreso total / N°
+                gananciaIndiv = pesoEgresoKg / nCerdos;
             } else {
-                diasCalculados = (double) tiempoIngresado;
+                // Con peso de ingreso → (egreso − ingreso) total / N°
+                double gananciaTotalKg = pesoEgresoKg - pesoIngresoKg;
+                gananciaIndiv = gananciaTotalKg / nCerdos;
             }
-            // consumo diario convertido a kg
-            double consumoKg = aKilogramos(Double.parseDouble(txtCantDiaria.getText().trim().replace(",", ".")), 
-                                          (String) cbUnidadCantDiaria.getSelectedItem());
-            // peso de ingreso y egreso convertidos a kg
-            double pIngresoKg = aKilogramos(Double.parseDouble(txtPesoIngreso.getText().trim().replace(",", ".")), 
-                                           (String) cbUnidadPesoIngreso.getSelectedItem());
-            
-            double pEgresoKg = aKilogramos(Double.parseDouble(txtPesoEgreso.getText().trim().replace(",", ".")), 
-                                          (String) cbUnidadPesoEgreso.getSelectedItem());
-            // Cálculo de Conversión Alimenticia
-            //Tipo de variable: Double, ya que puede tener decimales y es el resultado final del cálculo.
 
-            double alimentoTotalIndiv = diasCalculados * consumoKg;
-            double gananciaIndiv = (pEgresoKg - pIngresoKg) / nCerdos;
-            // Validación para evitar división por cero o resultados no válidos
             if (gananciaIndiv <= 0) {
-                lblResultadoCA.setText("Error: Ganancia no válida");
+                lblResultadoCA.setText("Error: Ganancia ≤ 0, revise los datos.");
                 return 0;
             }
-            // Cálculo final de Conversión Alimenticia
-            resultadoConversionAlimenticia = alimentoTotalIndiv / gananciaIndiv;
-            // label que muestra el resultado 
-            lblResultadoCA.setText(String.format("%.2f kg alimento / kg peso", resultadoConversionAlimenticia));
 
+            // ── Conversión Alimenticia ────────────────────────────
+            resultadoCA = alimentoTotalIndiv / gananciaIndiv;
+            lblResultadoCA.setText(String.format(
+                "%.4f  kg alimento / kg de ganancia de peso", resultadoCA));
+
+            return resultadoCA;
+
+        } catch (NumberFormatException nfe) {
+            JOptionPane.showMessageDialog(null,
+                "Error: Verifique que todos los campos numéricos estén completos\n" +
+                "y usen punto o coma como separador decimal.");
+            lblResultadoCA.setText("Datos incompletos");
+            return 0;
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error: " + e.getMessage());
-            lblResultadoCA.setText("Datos incompletos o inválidos");
+            lblResultadoCA.setText("Error de cálculo");
             return 0;
         }
-        return resultadoConversionAlimenticia;
+    }
+
+    // Porcino no calcula peso metabólico
+    @Override
+    public double calcularPesoMetabolico() { return 0; }
+
+    // ─────────────────────────────────────────────────────────────
+    //  Resultados para tabla (Porcino muestra solo CA)
+    // ─────────────────────────────────────────────────────────────
+    @Override
+    public Map<String, String> getResultadosParaTabla() {
+        Map<String, String> mapa = new LinkedHashMap<>();
+        mapa.put("Conversión Alimenticia (CA)",
+                 String.format("%.4f  kg alimento / kg ganancia de peso", resultadoCA));
+        return mapa;
     }
 }
